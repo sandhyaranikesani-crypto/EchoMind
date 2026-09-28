@@ -1,0 +1,15 @@
+.venv/
+venv/
+.git/
+.github/
+__pycache__/
+*.pyc
+*.db
+*.sqlite3
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.pytest_cache/
+.coverage
+htmlcov/

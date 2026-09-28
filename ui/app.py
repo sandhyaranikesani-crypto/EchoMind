@@ -370,13 +370,21 @@ except Exception as exc:
     st.sidebar.error(f"Database error: {exc}")
 
 if not brands:
-    st.sidebar.warning("No brands found. Seed the demo database to begin.")
-    if st.sidebar.button("Seed demo database"):
-        seed_database()
+    # On a fresh (e.g. hosted) deploy the SQLite file does not exist yet.
+    # Seed it automatically so judges never hit an empty screen; fall back to a
+    # manual button if the filesystem is not writable.
+    try:
+        with st.spinner("Preparing the demo database..."):
+            seed_database()
         st.rerun()
-    st.title("EchoMind")
-    st.info("The database is empty. Use the sidebar to seed the demo dataset.")
-    st.stop()
+    except Exception as exc:
+        st.sidebar.error(f"Auto-seed failed: {exc}")
+        if st.sidebar.button("Seed demo database"):
+            seed_database()
+            st.rerun()
+        st.title("EchoMind")
+        st.info("The database is empty. Use the sidebar to seed the demo dataset.")
+        st.stop()
 
 brand_labels = {b["name"]: b["id"] for b in brands}
 brand_name = st.sidebar.selectbox("Brand", list(brand_labels.keys()))
