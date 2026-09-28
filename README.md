@@ -1,115 +1,137 @@
-# EchoMind: AI Content Strategy Agent with Hindsight Memory
+# EchoMind — AI Content Strategy Agent with Hindsight Memory
 
-## 1. Project Purpose
+**EchoMind cures "strategic amnesia."** Most AI content tools are stateless vending machines: they generate copy but never remember what worked, what the brand's voice is, or what you rejected last week. EchoMind pairs **deterministic analytics** (SQLite) with **[Hindsight](https://hindsight.vectorize.io/) long‑term memory** so the agent learns from every decision and gets measurably better over time.
 
-EchoMind is a production-quality **AI Content Strategy Agent** built to solve the fundamental flaw of generative marketing tools: **Strategic Amnesia**.
-
-Current AI content tools function as stateless "content vending machines"—generating isolated copy without understanding what succeeded or failed previously, without remembering brand nuance or user critique, and without evolving their editorial recommendations over time.
-
-EchoMind integrates **Hindsight**—an open-source biomimetic long-term memory engine—as the core strategic cognitive layer. By combining Hindsight's multi-network memory (facts, experiences, observations, and evolving beliefs) with deterministic structured analytics, the agent acts as an autonomous strategic partner that:
-- Understands brand identity, audience personas, and strict guardrails.
-- Evaluates historical content and engagement metrics to pinpoint gaps and saturation.
-- Formulates high-conviction next-content recommendations with full causal justification ("why this, why now, and why this format").
-- Learns from explicit user feedback (acceptances, edits, rejections with critique).
-- Evolves its strategic hypotheses and confidence over time as evidence accumulates.
+> Deterministic math decides **which** editorial pillar is under‑served. Hindsight memory decides **how** to win it — the angle, the format, and the brand voice — learned from real feedback.
 
 ---
 
-## 2. Architecture & Operational Flow Overview
+## Why it matters
 
-The architecture implements a dual-engine paradigm: **Structured Relational Storage** for deterministic, tabular metrics, paired with **Hindsight** for qualitative, episodic, and strategic reasoning.
+Marketing teams constantly reinvent the wheel. EchoMind remembers:
+- **What performed** — quantitative metrics per pillar, format, and post.
+- **What the brand is** — voice, audience (ICP), and hard guardrails ("never post beginner tutorials").
+- **What you decided** — every accept / edit / reject with critique.
+- **What it has learned** — evolving beliefs consolidated from evidence.
 
-### The Core Operational Loop
-
-```
-User Request
-     │
-     ▼
-[ agent/ ] (Orchestrator receives request and sets context)
-     │
-     ▼
-[ memory/ ] (Hindsight Recall: World Facts, Agent Experiences, Evolving Beliefs)
-     │
-     ▼
-[ database/ ] (Structured Query: Content cadence, pillar frequencies, CTR benchmarks)
-     │
-     ▼
-[ strategy/ ] (Strategy Analysis: Gap & saturation detection, pattern synthesis)
-     │
-     ▼
-[ agent/ ] (Recommendation Formulation: Next post concept + causal justification)
-     │
-     ▼
-[ ui/ ] (User Presentation & Review: Marketer inspects, accepts, edits, or rejects)
-     │
-     ▼
-User Feedback (Critique, acceptance, or adjustments)
-     │
-     ▼
-[ memory/ ] (Hindsight Retain & Reflect: Record episode, update facts, calibrate belief confidences)
-```
+The result is a recommendation with full causal justification ("why this, why now, why this format") that **improves with each interaction**.
 
 ---
 
-## 3. Directory Responsibilities
+## The "memory is the star" moment
 
-The codebase enforces strict separation of concerns across seven primary modules:
+The app shows the same analysis narrated twice:
 
-| Directory | Core Responsibility | Planned Contents |
-| :--- | :--- | :--- |
-| `agent/` | **Agent Orchestration & Reasoning** | Coordinates the full decision cycle, builds structured prompts, manages LLM communication, and ensures causal provenance in recommendations. |
-| `database/` | **Structured Data Persistence** | Manages the relational database (e.g., SQLite / PostgreSQL), SQLAlchemy models, schema migrations, and deterministic analytical queries for posts, channels, and metrics. |
-| `memory/` | **Long-Term Strategic Memory (Hindsight)** | Houses the Hindsight memory client integration, abstracting memory operations (`retain`, `recall`, `reflect`) and managing schemas across Hindsight's 4 logical networks. |
-| `strategy/` | **Strategy Analytics & Gap Analysis** | Implements domain logic for content auditing: calculating publishing cadences, identifying under-served content pillars, and detecting strategic drift. |
-| `ui/` | **User Interface (Streamlit)** | Presentation layer rendering the strategy dashboard, recommendation cards with causal audit sheets, and interactive feedback controls. |
-| `tests/` | **Test Suite** | Unit, integration, and behavioral tests validating memory recall, feedback retention, database aggregations, and strategy scoring. |
-| `config/` | **Configuration & Environment Settings** | Application settings, environment variable loaders, LLM model parameters, thresholds, and memory bank identifiers. |
+| Without memory (stateless) | With Hindsight memory |
+| :--- | :--- |
+| Generic pick, generic prose | On‑brand voice, learned angle |
+| No history | Recalls past rejections & critiques |
+| Fixed format | **Switches format** when past feedback rejected the default |
+| Flat confidence | **Conviction rises** as evidence accumulates |
 
----
-
-## 4. Distinction: Structured Data vs. Long-Term Memory
-
-A key design principle of EchoMind is maintaining a sharp boundary between **factual/quantitative data** and **qualitative/strategic memory**:
-
-```
-┌───────────────────────────────────────┐   ┌───────────────────────────────────────┐
-│     Structured Relational Storage     │   │      Hindsight Long-Term Memory       │
-│         (SQLite / PostgreSQL)         │   │        (Biomimetic Memory Bank)       │
-├───────────────────────────────────────┤   ├───────────────────────────────────────┤
-│ • Exact post copy, timestamps, URLs   │   │ • World Facts: Brand voice, ICP,      │
-│ • Channel definitions & format tags   │   │   competitor guardrails, taboos       │
-│ • Quantitative metrics (impressions,  │   │ • Agent Experiences: Episodic history │
-│   clicks, CTR, likes, shares)         │   │   of recommendations & user critiques │
-│ • Factual interaction logs            │   │ • Entity Summaries: Synthesized       │
-│   (timestamp, recommendation_id,      │   │   observations on pillars & formats   │
-│   decision: ACCEPT / REJECT / EDIT)   │   │ • Evolving Beliefs: Editorial rules   │
-│ • Pillar cadence & calendar schedules │   │   of thumb with confidence scores     │
-├───────────────────────────────────────┤   ├───────────────────────────────────────┤
-│ Role: Deterministic aggregation,      │   │ Role: Causal reasoning, contextual    │
-│ exact filtering, and math computation │   │ understanding, and strategy evolution │
-└───────────────────────────────────────┘   └───────────────────────────────────────┘
-```
-
-### Why Both Are Essential:
-- **Relational SQL** answers: *"What was the average engagement rate for carousels vs. text posts in the last 60 days?"* and *"How many days has it been since we published under the 'System Design' pillar?"*
-- **Hindsight Memory** answers: *"Why does our audience reject beginner tutorials?"*, *"What editorial angle did the founder approve last month?"*, and *"How confident are we that technical teardowns drive enterprise buyer conversions?"*
+The **Watch it learn** tab runs a full cycle in one click — recommend → reject with critique → recommend again — and you can see the recommendation itself change.
 
 ---
 
-## 5. Planned Hindsight Integration
+## Architecture
 
-EchoMind treats Hindsight as a first-class cognitive substrate rather than an auxiliary search index:
+```
+User
+  │
+  ▼
+agent/orchestrator.py ──► strategy/engine.py ──► database/ (SQLite)   [WHAT is under-served: deterministic gap math]
+  │                                   
+  ├──► memory/ (Hindsight)            [WHY / HOW: brand voice, past feedback, evolving beliefs]
+  │        recall → beliefs, facts, experiences
+  │
+  ├──► agent/llm.py (Groq)            [Narrative + on-brand draft; deterministic fallback]
+  │
+  ▼
+ui/app.py (Streamlit)                 [Dashboard · Recommendation · Watch it learn · Memory · Ask]
+  │
+  ▼
+Feedback (accept / edit / reject + critique) ──► memory/ retain ──► the loop learns
+```
 
-1. **Four Logical Networks:**
-   - **World Facts:** Ground truth regarding the brand, ICP constraints, and hard prohibitions (e.g., *"Never disparage competitors"*).
-   - **Agent Experiences:** Episodic records of what the agent suggested, how the user responded, and why.
-   - **Entity Summaries:** Synthesized behavioral profiles of specific entities (e.g., how the LinkedIn channel behaves differently from Substack).
-   - **Evolving Beliefs:** Strategic hypotheses paired with confidence scores (e.g., *"Belief: Technical architecture post-mortems drive 3x more shares than general opinion pieces (Confidence: 0.88)"*).
+| Module | Responsibility |
+| :--- | :--- |
+| `agent/` | Orchestration, memory‑informed planning, LLM narrative & draft generation |
+| `database/` | SQLite schema, repository, deterministic aggregations, demo seed data |
+| `memory/` | Hindsight adapter (+ offline mock) behind a clean `MemoryAdapter` contract |
+| `strategy/` | Deterministic gap / saturation detection |
+| `config/` | Env + `.env` loading, settings, memory‑bank ID derivation |
+| `ui/` | Streamlit app (5 tabs, custom theme) |
+| `tests/` | `unittest` suite (memory loop, adapters, strategy) |
 
-2. **Core Operations:**
-   - **Recall:** Uses multi-strategy retrieval (TEMPR: temporal, entity/graph, keyword matching, and semantic similarity) to gather relevant brand constraints and active beliefs before generating a recommendation.
-   - **Retain:** Ingests user decisions (acceptances, edits, critiques) into episodic memory and updates factual brand guidelines.
-   - **Reflect:** Synthesizes patterns across recent interactions, updating belief confidences and detecting when brand strategy has drifted.
+---
 
-3. **API-Agnostic Abstraction:**
-   The `memory/` package will use an abstract interface (`MemoryClient`) to encapsulate Hindsight calls. This guarantees that application logic remains decoupled from specific SDK method signatures and facilitates seamless testing and local resilience.
+## How Hindsight memory is used
+
+EchoMind treats Hindsight as its cognitive layer, not a search index. See `memory/hindsight_adapter.py`.
+
+- **One memory bank per brand** (`ensure_bank`) with a strategist **mission** and **disposition**, giving strict tenant isolation and a consistent reasoning personality.
+- **Retain** (`retain_*`): brand rules are stored as **world facts**; every accept/edit/reject + critique is stored as an **experience** (with structured metadata). Retain is synchronous so the fact is immediately recallable.
+- **Recall** (`recall_strategic_context`): three **type‑scoped** recalls run **in parallel** (`types=["world"|"experience"|"observation"]`, TEMPR multi‑strategy retrieval) to gather guardrails, past feedback, and learned beliefs before every recommendation.
+- **Observations = evolving beliefs**: Hindsight automatically consolidates repeated evidence into deduplicated, evidence‑grounded **observations**. EchoMind surfaces these as the agent's confidence‑weighted beliefs — no hand‑rolled belief store.
+- **Reflect** (`reflect_on_strategy`): powers the **Ask the strategist** tab and strategy synthesis, shaped by the bank's mission/disposition.
+- **Memory changes the decision, not just the words**: recalled rejections switch the recommended format, and recalled beliefs/critiques set the editorial angle (`agent/orchestrator.py::_memory_plan`).
+
+If Hindsight is unreachable, EchoMind degrades **transparently** to deterministic‑only and says so — it never silently falls back to the mock.
+
+---
+
+## Quick start
+
+Requires Python 3.12+ and a [Hindsight](https://ui.hindsight.vectorize.io/signup) key (Cloud has free credits) plus an LLM key ([Groq](https://console.groq.com/keys) recommended).
+
+```bash
+# 1. Install
+python -m venv .venv
+# Windows: .\.venv\Scripts\Activate.ps1   |   macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Configure keys
+cp .env.example .env         # then edit .env and paste your keys
+
+# 3. Seed the demo database (two brands)
+python -m database.seed
+
+# 4. Run
+streamlit run ui/app.py
+```
+
+`.env` (auto‑loaded, gitignored):
+
+```
+HINDSIGHT_API_KEY=your-hindsight-cloud-key
+LLM_API_KEY=your-groq-key
+# Defaults: Hindsight Cloud + Groq openai/gpt-oss-120b. Override in .env if needed.
+```
+
+**Offline mode:** set `HINDSIGHT_USE_MOCK=true` to run with the in‑memory mock and no LLM (deterministic narratives). Great for development and CI.
+
+---
+
+## Demo flow (60–90s)
+
+1. **Dashboard** — point out the *Engineering Culture & Leadership* gap (6.7% vs 20% target).
+2. **Recommendation** — *Generate*. Compare **Without memory** vs **With Hindsight memory**: on‑brand angle, recalled guardrails/beliefs, and a **conviction** boost.
+3. **Watch it learn** — one click: reject with a critique, regenerate; the format/angle **changes** and the agent recalls your critique.
+4. **Memory** — open the brand's brain (world facts / observations / experiences); switch to **Verdant Coffee Co.** to prove tenant isolation.
+5. **Ask** — ask "What should we avoid, and why?" → answered by Hindsight reflection.
+
+---
+
+## Testing
+
+```bash
+python -m unittest discover -s tests
+```
+
+The suite is hermetic (forces deterministic narratives, uses a temp DB and the in‑memory mock). Tests requiring the Hindsight SDK or a live server skip cleanly when unavailable.
+
+---
+
+## Tech stack
+
+Python · Streamlit · SQLite · [Hindsight](https://hindsight.vectorize.io/) (`hindsight-client`) · Groq (OpenAI‑compatible LLM API).

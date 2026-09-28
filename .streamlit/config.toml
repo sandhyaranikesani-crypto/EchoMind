@@ -1,0 +1,14 @@
+# EchoMind Streamlit theme
+[theme]
+base = "dark"
+primaryColor = "#8B6BFF"
+backgroundColor = "#0B1020"
+secondaryBackgroundColor = "#121A32"
+textColor = "#FFFFFF"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

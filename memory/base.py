@@ -58,6 +58,28 @@ class MemoryAdapter(ABC):
     exclusively to the strategy layer.
     """
 
+    def ensure_bank(self, brand_id: str, name: Optional[str] = None) -> str:
+        """Idempotently provision the brand's memory store.
+
+        Default is a no-op for adapters that do not need explicit provisioning
+        (e.g. the in-memory mock). Concrete backends may override to create the
+        bank and configure its mission/disposition.
+        """
+        return brand_id
+
+    def list_memories(
+        self,
+        brand_id: str,
+        limit: int = 50,
+    ) -> List[dict]:
+        """Return a flat ledger of stored memories for inspection.
+
+        Each item is a dict: {"text": str, "type": "world"|"experience"|
+        "observation"|"belief", "when": Optional[str]}. Default is empty; the
+        concrete backends override this.
+        """
+        return []
+
     @abstractmethod
     def retain_brand_fact(
         self,

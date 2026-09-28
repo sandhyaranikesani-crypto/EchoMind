@@ -213,6 +213,85 @@ def seed_database(db_path: Optional[str] = None) -> None:
                 (p_id, (pub_date + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"), imp, reach, clicks, likes, comm, shares, saves, conv, eng_rate),
             )
 
+        # =====================================================================
+        # Second brand (for the multi-tenant memory-isolation demo).
+        # A different domain entirely so its dashboard AND its memory bank are
+        # clearly distinct from EchoMind AI.
+        # =====================================================================
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO brands (id, name, industry, website, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "brand_verdant",
+                "Verdant Coffee Co.",
+                "Specialty Coffee & Retail",
+                "https://verdant.coffee",
+                (now - timedelta(days=90)).strftime("%Y-%m-%d %H:%M:%S"),
+                now.strftime("%Y-%m-%d %H:%M:%S"),
+            ),
+        )
+
+        verdant_pillars = [
+            ("vp_origin", "brand_verdant", "Origin Stories & Sourcing", "Farmer partnerships, single-origin lots, harvest notes", 35.0, 1),
+            ("vp_brewing", "brand_verdant", "Brewing Guides & Gear", "Recipes, ratios, grinder and kit reviews", 25.0, 1),
+            ("vp_sustain", "brand_verdant", "Sustainability & Community", "Fair trade, composting, local cafe events", 25.0, 1),
+            ("vp_promo", "brand_verdant", "Promotions & Seasonal Drops", "Limited roasts, discounts, subscriptions", 15.0, 1),
+        ]
+        for pil_id, b_id, pil_name, pil_desc, t_share, is_act in verdant_pillars:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO content_pillars
+                (id, brand_id, name, description, target_share_pct, is_active)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (pil_id, b_id, pil_name, pil_desc, t_share, is_act),
+            )
+
+        conn.execute("DELETE FROM posts WHERE brand_id = 'brand_verdant'")
+
+        verdant_posts = [
+            ("vpost_1", "vp_origin", "linkedin", "li_carousel",
+             "Meet the Cooperative Behind Our Ethiopian Yirgacheffe",
+             "A photo tour of the washing station and the families who grow our floral, citrus-forward lot...",
+             now - timedelta(days=3), 22000, 18000, 900, 640, 70, 120, 150, 40, 4.00),
+            ("vpost_2", "vp_origin", "x_twitter", "tw_thread",
+             "Thread: Why washed vs natural process changes everything in the cup",
+             "1/6 The same cherry can taste like lemon or like blueberry jam depending on how it's processed...",
+             now - timedelta(days=8), 15000, 12500, 520, 410, 44, 95, 60, 12, 4.07),
+            ("vpost_3", "vp_brewing", "linkedin", "li_text",
+             "The 1:16 Ratio: Our House Pour-Over Recipe",
+             "Dial in a repeatable cup with a simple ratio, a 45-second bloom, and three pours...",
+             now - timedelta(days=5), 18000, 15000, 610, 380, 33, 60, 90, 22, 3.41),
+            ("vpost_4", "vp_promo", "x_twitter", "tw_short",
+             "Seasonal drop: Winter Solstice blend is live",
+             "Cocoa, dried cherry, warm spice. 200 bags only. Subscribers get first access.",
+             now - timedelta(days=11), 9000, 7600, 300, 180, 12, 20, 25, 51, 2.63),
+            # Sustainability is the clear GAP for Verdant (target 25%, near-zero output).
+            ("vpost_5", "vp_sustain", "linkedin", "li_text",
+             "How We Cut Cafe Waste by 60% with Compost Partnerships",
+             "Spent grounds and cups now feed a local community garden instead of landfill...",
+             now - timedelta(days=40), 12000, 9800, 380, 300, 40, 70, 55, 9, 3.88),
+        ]
+        for p_id, pil_id, plat_id, f_id, title, copy, pub_date, imp, reach, clicks, likes, comm, shares, saves, conv, eng_rate in verdant_posts:
+            conn.execute(
+                """
+                INSERT INTO posts
+                (id, brand_id, pillar_id, platform_id, format_id, title, content_text, published_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED')
+                """,
+                (p_id, "brand_verdant", pil_id, plat_id, f_id, title, copy, pub_date.strftime("%Y-%m-%d %H:%M:%S")),
+            )
+            conn.execute(
+                """
+                INSERT INTO performance_metrics
+                (post_id, recorded_at, impressions, reach, clicks, likes, comments, shares, saves, conversions, engagement_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (p_id, (pub_date + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S"), imp, reach, clicks, likes, comm, shares, saves, conv, eng_rate),
+            )
+
     conn.close()
 
 

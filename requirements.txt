@@ -1,0 +1,19 @@
+# EchoMind prototype dependencies
+#
+# NOTE: These use lower-bound (>=) ranges rather than exact pins because the
+# environment runs a bleeding-edge Python (3.14) where only the newest wheels
+# are available. Once you settle on a Python version, run `pip freeze` to lock
+# exact versions for reproducibility.
+
+# Core UI + data presentation
+streamlit>=1.40
+pandas>=2.2.3
+
+# Hindsight biomimetic long-term memory SDK (Hindsight Cloud or self-hosted).
+# Required for the real memory backend; the in-memory MockMemoryAdapter is used
+# only when HINDSIGHT_USE_MOCK=true.
+hindsight-client
+
+# LLM narratives via Groq's OpenAI-compatible endpoint (default) or OpenAI.
+# EchoMind falls back to a deterministic narrative when no LLM key is set.
+openai>=1.54

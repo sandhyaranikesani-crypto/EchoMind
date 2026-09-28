@@ -26,6 +26,16 @@ from memory.base import (
 from memory.hindsight_adapter import HindsightMemoryAdapter
 from memory.mock_adapter import MockMemoryAdapter
 
+# The Hindsight SDK is an optional dependency. Tests that require a live client
+# object are skipped cleanly when it is not installed (offline-first design),
+# mirroring the live-server skip in TestLiveHindsightIntegration.
+try:
+    import hindsight_client  # noqa: F401
+
+    _HINDSIGHT_SDK_AVAILABLE = True
+except Exception:
+    _HINDSIGHT_SDK_AVAILABLE = False
+
 
 class TestMemoryAdapterContract(unittest.TestCase):
     """Test interface compliance and base invariants."""
@@ -199,6 +209,9 @@ class TestHindsightFailureAndGating(unittest.TestCase):
         adapter = get_memory_adapter(mock_settings)
         self.assertIsInstance(adapter, MockMemoryAdapter)
 
+        if not _HINDSIGHT_SDK_AVAILABLE:
+            self.skipTest("hindsight_client SDK not installed; real-adapter path unavailable.")
+
         real_settings = Settings(
             HINDSIGHT_USE_MOCK=False,
             HINDSIGHT_BASE_URL="http://localhost:8888",
@@ -206,6 +219,9 @@ class TestHindsightFailureAndGating(unittest.TestCase):
         adapter_real = get_memory_adapter(real_settings)
         self.assertIsInstance(adapter_real, HindsightMemoryAdapter)
 
+    @unittest.skipUnless(
+        _HINDSIGHT_SDK_AVAILABLE, "hindsight_client SDK not installed."
+    )
     def test_hindsight_failure_raises_unavailable_error(self):
         """Verify real Hindsight failures raise HindsightUnavailableError (no silent fallback)."""
         # Point to an unreachable port

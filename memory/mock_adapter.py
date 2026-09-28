@@ -119,6 +119,28 @@ class MockMemoryAdapter(MemoryAdapter):
             active_beliefs=matched_beliefs,
         )
 
+    def list_memories(self, brand_id: str, limit: int = 50) -> list:
+        """Flat ledger of everything stored for this brand (for the UI)."""
+        bank = self._get_bank(brand_id)
+        items = []
+        for content in bank["facts"].values():
+            items.append({"text": content, "type": "world", "when": None})
+        for exp in bank["experiences"].values():
+            ts = exp.get("timestamp")
+            items.append({
+                "text": exp.get("content", ""),
+                "type": "experience",
+                "when": ts.strftime("%Y-%m-%d %H:%M") if ts else None,
+            })
+        for belief in bank["beliefs"].values():
+            la = getattr(belief, "learned_at", None)
+            items.append({
+                "text": getattr(belief, "what_was_learned", str(belief)),
+                "type": "belief",
+                "when": la.strftime("%Y-%m-%d %H:%M") if la else None,
+            })
+        return items[:limit]
+
     def reflect_on_strategy(
         self,
         brand_id: str,
