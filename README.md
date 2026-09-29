@@ -1,6 +1,6 @@
 # EchoMind: AI Content Strategy Agent with Hindsight Memory
 
-**EchoMind cures "strategic amnesia."** Most AI content tools are stateless vending machines. They generate copy but never remember what worked, what the brand's voice is, or what you rejected last week. EchoMind pairs **deterministic analytics** (SQLite) with **[Hindsight](https://hindsight.vectorize.io/) long-term memory** so the agent learns from every decision and gets measurably better over time.
+**EchoMind makes an AI content strategist remember.** It pairs deterministic analytics (SQLite) with [Hindsight](https://hindsight.vectorize.io/) long-term memory, so recommendations can use a brand's voice, prior decisions, critiques, and evidence-backed beliefs.
 
 > Deterministic math decides **which** editorial pillar is under-served. Hindsight memory decides **how** to win it: the angle, the format, and the brand voice, learned from real feedback.
 
@@ -14,7 +14,7 @@ Marketing teams constantly reinvent the wheel. EchoMind remembers:
 - **What you decided:** every accept, edit, or reject with critique.
 - **What it has learned:** evolving beliefs consolidated from evidence.
 
-The result is a recommendation with full causal justification ("why this, why now, why this format") that **improves with each interaction**.
+The result is a recommendation with an inspectable causal trail ("why this, why now, why this format"). Later accept, edit, or reject decisions are retained in that brand's bank and can change subsequent recommendations.
 
 ---
 
@@ -27,9 +27,9 @@ The app shows the same analysis narrated twice:
 | Generic pick, generic prose | On-brand voice, learned angle |
 | No history | Recalls past rejections and critiques |
 | Fixed format | **Switches format** when past feedback rejected the default |
-| Flat confidence | **Conviction rises** as evidence accumulates |
+| Generic confidence label | **Confidence reflects** current metrics and recalled evidence |
 
-The **Learning** page runs a full cycle in one click (recommend, reject with critique, recommend again) and highlights the exact structural diff (format, angle, conviction) caused by memory.
+The **Learning** page runs a full cycle in one click (recommend, reject with critique, recommend again) and shows the before/after angle, format, and confidence alongside the recalled feedback that caused the change.
 
 ---
 
@@ -67,7 +67,7 @@ agent/orchestrator.py ──► strategy/engine.py ──► database/ (SQLite) 
 | `strategy/` | Deterministic gap and saturation detection, weekly editorial calendar export |
 | `config/` | Environment and `.env` loading, settings, memory-bank ID derivation |
 | `ui/` | Native multipage Streamlit app (`overview`, `strategy`, `learning`, `memory`, `ask`, `system`) with theme-adaptive styling |
-| `tests/` | Comprehensive test suite (memory loop, adapters, strategy, guardrails, calendar) |
+| `tests/` | Agent and adapter tests, guardrail/calendar/provenance checks, and headless multipage smoke coverage |
 
 ---
 
@@ -78,7 +78,7 @@ agent/orchestrator.py ──► strategy/engine.py ──► database/ (SQLite) 
 3. **Exportable Weekly Editorial Calendar:** Converts detected strategic deficits into a balanced 5-day editorial plan exportable directly as **CSV** and **Markdown**.
 4. **Honest Uncertainty:** Clearly identifies low-evidence recommendations as *Exploratory* and displays an explicit assumptions callout when historical volume or feedback is sparse.
 5. **Belief Conviction Timeline:** Visualizes how the agent's confidence in strategic beliefs strengthens over time as supporting evidence accumulates.
-6. **Restrained Visual Design:** Native Light, Dark, and System default mode support using theme variables and WCAG AA compliant design tokens. No emojis in headings, no neon glows, and no marketing fluff.
+6. **Theme-aware interface:** Streamlit's built-in Light, Dark, and System modes, theme-driven chart colors, neutral surfaces, and responsive page layouts.
 
 ---
 
@@ -86,20 +86,20 @@ agent/orchestrator.py ──► strategy/engine.py ──► database/ (SQLite) 
 
 EchoMind treats Hindsight as its cognitive layer, not a search index. See `memory/hindsight_adapter.py`.
 
-- **One memory bank per brand** (`ensure_bank`) with a strategist **mission** and **disposition**, giving strict tenant isolation and a consistent reasoning personality.
+- **One memory bank per brand** (`ensure_bank`) with a strategist **mission** and **disposition**, keeping recall and retention scoped to that brand.
 - **Retain** (`retain_*`): brand rules are stored as **world facts**; every accept, edit, or reject with critique is stored as an **experience** (with structured metadata). Retain is synchronous so the fact is immediately recallable.
 - **Recall** (`recall_strategic_context`): three type-scoped recalls (`types=["world"]`, `["experience"]`, `["observation"]`) using Hindsight's multi-strategy retrieval gather guardrails, past feedback, and learned beliefs before every recommendation.
 - **Observations become evolving beliefs**: Hindsight automatically consolidates repeated evidence into deduplicated, evidence-grounded **observations**. EchoMind surfaces these as the agent's beliefs, so there is no hand-rolled belief store.
 - **Reflect** (`reflect_on_strategy`): powers the **Ask the strategist** page and strategy synthesis, shaped by the bank's mission and disposition.
 - **Memory changes the decision, not just the words**: recalled rejections switch the recommended format, and recalled beliefs or critiques set the editorial angle (`agent/orchestrator.py::_memory_plan`).
 
-If Hindsight is unreachable, EchoMind degrades **transparently** to deterministic-only and says so. It never silently falls back to the mock.
+If Hindsight is unreachable, EchoMind degrades **transparently** to deterministic-only analysis and says that no recalled memory informed the result. It never silently falls back to the mock.
 
 ---
 
 ## Quick start
 
-Requires **Python 3.12** (recommended; 3.13 also works). You also need a [Hindsight](https://ui.hindsight.vectorize.io/signup) key (Cloud has free credits) and an LLM key ([Groq](https://console.groq.com/keys) recommended).
+Requires **Python 3.12** and Streamlit 1.40 or newer. Hindsight and LLM keys are optional for local development; without them, use the explicit mock backend and deterministic LLM fallback.
 
 **1. Create a virtual environment and install:**
 
@@ -136,13 +136,15 @@ LLM_API_KEY=your-groq-key
 LLM_BASE_URL=https://api.groq.com/openai/v1
 LLM_MODEL=openai/gpt-oss-120b
 
-# Option B: Azure OpenAI (Optional)
+# Option B: Azure OpenAI
 # LLM_PROVIDER=azure
 # LLM_API_KEY=your-azure-key
 # LLM_BASE_URL=https://<your-resource-name>.openai.azure.com/
 # LLM_MODEL=<your-deployment-name>
 # AZURE_OPENAI_API_VERSION=2024-06-01
 ```
+
+For Azure OpenAI, `LLM_BASE_URL` is the Azure resource endpoint and `LLM_MODEL` is the deployed model name. `AZURE_OPENAI_API_VERSION` is optional and defaults to `2024-06-01`.
 
 `.env` is auto-loaded at startup and is gitignored.
 
@@ -158,28 +160,24 @@ python -m database.seed
 streamlit run ui/app.py
 ```
 
-**Offline mode:** set `HINDSIGHT_USE_MOCK=true` to run with the in-memory mock and no LLM (deterministic narratives). Useful for development and CI.
+**Offline mode:** in PowerShell set `$env:HINDSIGHT_USE_MOCK="true"` and leave `$env:LLM_API_KEY` empty. The in-memory mock persists only for the current Streamlit session; deterministic narratives need no network access.
 
 ---
 
 ## Demo flow (75 seconds)
 
-1. **Overview:** Show the *Engineering Culture & Leadership* gap (6.7% actual vs 20% target).
-2. **Strategy:** Click *Generate recommendation*. Contrast *Without memory* vs *With Hindsight memory*. Inspect the **Decision Provenance Matrix** and generate a draft to verify **Responsible AI Guardrail Checks**.
-3. **Learning:** Run the *Learning simulation*. Show the before/after diff highlighting how the format switched, the angle adapted, and the critique was recalled.
-4. **Memory:** Open the memory inspector. View the belief conviction timeline and evidence links. Switch brand to *Verdant Coffee Co.* in the sidebar to prove strict tenant isolation.
-5. **Ask:** Ask "What should we avoid, and why?" to show Hindsight reflection synthesizing patterns.
-6. **System:** Review the architecture diagram and diagnostics confirming memory backend and model configuration.
+See [docs/DEMO.md](docs/DEMO.md) for the 75-second reviewer script and preparation steps.
 
 ---
 
 ## Testing
 
-```bash
+```powershell
+$env:HINDSIGHT_USE_MOCK="true"
 pytest
 ```
 
-The suite is hermetic (it forces deterministic narratives and uses an isolated temporary database and the in-memory mock). Tests that require the Hindsight SDK or a live server skip cleanly when unavailable.
+The suite covers the memory loop, adapters, deterministic guardrails and calendar exports, confidence/provenance, and every Streamlit page through `AppTest`. The live-server integration test skips when no Hindsight service is reachable.
 
 ---
 
