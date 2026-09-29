@@ -131,6 +131,8 @@ class MockMemoryAdapter(MemoryAdapter):
                 "text": exp.get("content", ""),
                 "type": "experience",
                 "when": ts.strftime("%Y-%m-%d %H:%M") if ts else None,
+                "decision": exp.get("decision"),
+                "phase": exp.get("phase"),
             })
         for belief in bank["beliefs"].values():
             la = getattr(belief, "learned_at", None)
@@ -138,6 +140,10 @@ class MockMemoryAdapter(MemoryAdapter):
                 "text": getattr(belief, "what_was_learned", str(belief)),
                 "type": "belief",
                 "when": la.strftime("%Y-%m-%d %H:%M") if la else None,
+                "why": getattr(belief, "why_it_was_learned", ""),
+                "confidence": getattr(belief, "confidence_score", 0.75),
+                "evidence": getattr(belief, "supporting_evidence_context", []),
+                "phase": getattr(belief, "strategy_phase", "default"),
             })
         return items[:limit]
 

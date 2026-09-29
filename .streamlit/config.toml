@@ -1,10 +1,7 @@
-# EchoMind Streamlit theme
+# EchoMind Streamlit Configuration
+# Native Light, Dark, and System default modes are fully supported.
 [theme]
-base = "dark"
-primaryColor = "#8B6BFF"
-backgroundColor = "#0B1020"
-secondaryBackgroundColor = "#121A32"
-textColor = "#FFFFFF"
+primaryColor = "#2563EB"
 font = "sans serif"
 
 [server]
