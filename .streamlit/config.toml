@@ -1,10 +1,6 @@
-# EchoMind Streamlit theme
+# EchoMind Streamlit Configuration
+# Leave theme.base unset so the built-in settings menu controls Light, Dark, or System mode.
 [theme]
-base = "dark"
-primaryColor = "#8B6BFF"
-backgroundColor = "#0B1020"
-secondaryBackgroundColor = "#121A32"
-textColor = "#FFFFFF"
 font = "sans serif"
 
 [server]

@@ -134,6 +134,8 @@ class EchoMindAgent:
         narrative = compose_recommendation(brand, analysis, context)
         memory_plan = self._memory_plan(analysis, context)
         recommendation_id = uuid.uuid4().hex[:12]
+        conviction = self._conviction(analysis, context)
+        provenance = self._build_provenance(analysis, context, memory_plan)
 
         return {
             "recommendation_id": recommendation_id,
@@ -150,6 +152,9 @@ class EchoMindAgent:
             "analysis": analysis,
             "memory_online": self.memory_online,
             "memory_error": self.memory_error,
+            "conviction": conviction,
+            "decision_provenance": provenance,
+            "uncertainty": conviction.get("uncertainty_notes", []),
             "brand_constraints": list(getattr(context, "brand_constraints", []) or []),
             "audience_insights": list(getattr(context, "audience_insights", []) or []),
             "relevant_experiences": list(getattr(context, "relevant_experiences", []) or []),
@@ -177,6 +182,8 @@ class EchoMindAgent:
         context = self._recall_context(brand_id, analysis)
         with_memory = compose_recommendation(brand, analysis, context)
         memory_plan = self._memory_plan(analysis, context)
+        conviction = self._conviction(analysis, context)
+        provenance = self._build_provenance(analysis, context, memory_plan)
 
         return {
             "recommendation_id": uuid.uuid4().hex[:12],
@@ -193,20 +200,101 @@ class EchoMindAgent:
             "memory_error": self.memory_error,
             "without_memory": without_memory,
             "with_memory": with_memory,
-            "conviction": self._conviction(analysis, context),
+            "conviction": conviction,
+            "decision_provenance": provenance,
+            "uncertainty": conviction.get("uncertainty_notes", []),
             "brand_constraints": list(getattr(context, "brand_constraints", []) or []),
             "relevant_experiences": list(getattr(context, "relevant_experiences", []) or []),
             "active_beliefs": list(getattr(context, "active_beliefs", []) or []),
         }
 
+    @classmethod
+    def _build_provenance(
+        cls,
+        analysis: StrategyAnalysisResult,
+        context: Optional[Any],
+        memory_plan: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Construct full decision provenance for recalled inputs."""
+        provenance: List[Dict[str, Any]] = []
+
+        pillar = analysis.recommended_pillar or {}
+        if pillar:
+            delta = pillar.get("share_delta_pct", 0)
+            provenance.append({
+                "source": "Deterministic SQL Database",
+                "category": "Factual Content Gap",
+                "type": "sql",
+                "evidence": f"Pillar '{pillar.get('pillar_name')}' is {abs(delta):.1f}% below target allocation.",
+                "age": "Real-time SQL aggregation",
+                "weight": "Foundational",
+                "impact": f"Selected target editorial pillar: '{pillar.get('pillar_name')}'.",
+            })
+
+        fmt = analysis.recommended_format or {}
+        if fmt:
+            provenance.append({
+                "source": "Deterministic SQL Database",
+                "category": "Factual Benchmark",
+                "type": "sql",
+                "evidence": f"Format '{fmt.get('format_name')}' has {fmt.get('avg_engagement_rate')}% avg historical engagement.",
+                "age": "Historical metrics",
+                "weight": "Baseline benchmark",
+                "impact": "Initial format benchmark prior to memory evaluation.",
+            })
+
+        if context is None:
+            return provenance
+
+        constraints = getattr(context, "brand_constraints", []) or []
+        for c in constraints:
+            provenance.append({
+                "source": "Hindsight Memory Bank",
+                "category": "Brand Voice & Guardrail",
+                "type": "world",
+                "evidence": str(c),
+                "age": "Static guideline",
+                "weight": "High (Hard constraint)",
+                "impact": "Constrains narrative tone, ICP persona, and taboo boundaries.",
+            })
+
+        beliefs = getattr(context, "active_beliefs", []) or []
+        for b in beliefs:
+            conf = getattr(b, "confidence_score", 0.75)
+            la = getattr(b, "learned_at", None)
+            age_str = la.strftime("%Y-%m-%d") if la else "Consolidated observation"
+            provenance.append({
+                "source": "Hindsight Memory Bank",
+                "category": "Learned Strategic Belief",
+                "type": "observation",
+                "evidence": getattr(b, "what_was_learned", str(b)),
+                "age": age_str,
+                "weight": f"Confidence {conf:.2f}",
+                "impact": "Informs recommended editorial angle and positioning.",
+            })
+
+        experiences = getattr(context, "relevant_experiences", []) or []
+        for exp in experiences:
+            is_rejection = "reject" in exp.lower()
+            provenance.append({
+                "source": "Hindsight Memory Bank",
+                "category": "Prior Human Review",
+                "type": "experience",
+                "evidence": str(exp),
+                "age": "Episodic memory",
+                "weight": "Decisive (Override)" if is_rejection else "Moderate",
+                "impact": (
+                    "Triggered format switch away from rejected format."
+                    if (is_rejection and memory_plan.get("adjusted"))
+                    else "Reinforces positive historical review patterns."
+                ),
+            })
+
+        return provenance
+
     @staticmethod
     def _conviction(analysis: StrategyAnalysisResult, context) -> Dict[str, Any]:
-        """Heuristic 0-100 confidence, rising with stronger + more-remembered evidence.
-
-        Deterministic signal (gap severity, benchmark availability) sets the
-        base; recalled memory (facts, beliefs, past feedback) adds conviction —
-        which is exactly the "memory makes the agent more sure" story.
-        """
+        """Heuristic 0-100 confidence, honestly reflecting evidence depth."""
         score = 40
         pillar = analysis.recommended_pillar or {}
         if pillar.get("gap_severity") == "HIGH":
@@ -224,17 +312,29 @@ class EchoMindAgent:
         memory_boost = min(25, n_facts * 3 + n_beliefs * 5 + n_exp * 4)
         score = min(100, score + memory_boost)
 
+        uncertainty_notes: List[str] = []
+        if analysis.total_posts < 5:
+            uncertainty_notes.append("Small historical post volume (<5 published posts). Engagement metrics may carry high variance.")
+        if not n_exp:
+            uncertainty_notes.append("No prior human reviews recorded for this pillar/format combination. Recommendation is exploratory.")
+        if not n_beliefs:
+            uncertainty_notes.append("No active strategic beliefs consolidated for this phase yet.")
+        if abs(pillar.get("share_delta_pct", 0)) < 5.0:
+            uncertainty_notes.append("Target pillar deficit is within standard variance range (+/-5%).")
+
         if score >= 80:
-            label = "High conviction"
+            label = "High conviction (evidence-grounded)"
         elif score >= 60:
             label = "Moderate conviction"
         else:
-            label = "Exploratory"
+            label = "Exploratory (insufficient evidence)"
+
         return {
             "score": score,
             "label": label,
             "memory_boost": memory_boost,
             "evidence": {"facts": n_facts, "beliefs": n_beliefs, "experiences": n_exp},
+            "uncertainty_notes": uncertainty_notes,
         }
 
     # -------------------------------------------------------------------------
@@ -286,9 +386,16 @@ class EchoMindAgent:
         beliefs = [getattr(b, "what_was_learned", "") for b in (getattr(context, "active_beliefs", []) or [])]
         experiences = list(getattr(context, "relevant_experiences", []) or [])
         blob = " ".join(beliefs + experiences).lower()
+        rejection_feedback = " ".join(
+            experience for experience in experiences if "reject" in experience.lower()
+        ).lower()
 
         # 1) Editorial angle derived from beliefs / feedback (memory-only signal).
-        if any(k in blob for k in ["teardown", "post-mortem", "postmortem", "incident", "outage", "metric"]):
+        if rejection_feedback and any(
+            key in rejection_feedback for key in ["timeline", "incident", "post-mortem", "postmortem", "code"]
+        ):
+            plan["angle"] = "Lead with a technical post-mortem that includes code and an incident timeline."
+        elif any(k in blob for k in ["teardown", "post-mortem", "postmortem", "incident", "outage", "metric"]):
             plan["angle"] = "Lead with a concrete incident or post-mortem, with a real timeline and hard metrics, not opinion."
         elif any(k in blob for k in ["technical", "architecture", "deep-dive", "deep dive", "benchmark"]):
             plan["angle"] = "Go deep and technical, showing the system detail senior engineers respect."

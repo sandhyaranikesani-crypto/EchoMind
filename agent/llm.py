@@ -168,6 +168,29 @@ def _memory_narrative_lines(context: Optional[Any]) -> List[str]:
 # ---------------------------------------------------------------------------
 # Optional LLM narrative
 # ---------------------------------------------------------------------------
+def _get_openai_client():
+    """Build an OpenAI or AzureOpenAI client based on configured settings."""
+    import os
+    base_url = (settings.LLM_BASE_URL or "").strip()
+    api_key = settings.LLM_API_KEY
+
+    # Optional Azure OpenAI support via LLM_BASE_URL or provider='azure'
+    if "azure.com" in base_url.lower() or (settings.LLM_PROVIDER or "").lower() == "azure":
+        from openai import AzureOpenAI
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-06-01")
+        return AzureOpenAI(
+            azure_endpoint=base_url,
+            api_key=api_key,
+            api_version=api_version,
+        )
+
+    from openai import OpenAI
+    client_kwargs: Dict[str, Any] = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    return OpenAI(**client_kwargs)
+
+
 def _try_compose_with_llm(
     brand: Dict[str, Any],
     analysis: Any,
@@ -176,12 +199,7 @@ def _try_compose_with_llm(
 ) -> Optional[str]:
     """Return an LLM-authored body, or None to fall back deterministically."""
     try:  # pragma: no cover - network / optional dependency path
-        from openai import OpenAI
-
-        client_kwargs: Dict[str, Any] = {"api_key": settings.LLM_API_KEY}
-        if settings.LLM_BASE_URL:
-            client_kwargs["base_url"] = settings.LLM_BASE_URL
-        client = OpenAI(**client_kwargs)
+        client = _get_openai_client()
 
         system = (
             "You are EchoMind, an AI content strategist. Using ONLY the supplied "
@@ -287,12 +305,7 @@ def compose_draft(
 
 def _try_compose_draft_with_llm(brand, recommendation, context, pillar, fmt):
     try:  # pragma: no cover - network path
-        from openai import OpenAI
-
-        kwargs: Dict[str, Any] = {"api_key": settings.LLM_API_KEY}
-        if settings.LLM_BASE_URL:
-            kwargs["base_url"] = settings.LLM_BASE_URL
-        client = OpenAI(**kwargs)
+        client = _get_openai_client()
 
         constraints = list(getattr(context, "brand_constraints", []) or [])
         beliefs = [getattr(b, "what_was_learned", str(b)) for b in (getattr(context, "active_beliefs", []) or [])]
