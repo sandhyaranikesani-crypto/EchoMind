@@ -3,7 +3,6 @@
 Designed for an internal analytics tool aesthetic:
 - Responsive, theme-aware CSS using CSS variables and Streamlit design tokens.
 - No hardcoded hex colors; supports Light, Dark, and System modes seamlessly.
-- Strict WCAG AA contrast compliance in both modes.
 - Restrained 4/8px spacing, subtle borders, no gratuitous glow or neon effects.
 """
 
@@ -109,7 +108,7 @@ def apply_custom_styles() -> None:
             color: var(--text-color);
             margin-bottom: 0.5rem;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0;
         }
 
         /* Diff comparison container */
@@ -147,7 +146,6 @@ def apply_custom_styles() -> None:
             border-radius: 4px;
             font-weight: 500;
             font-size: 0.875rem;
-            transition: all 0.15s ease-in-out;
         }
         .em-muted {
             color: var(--em-muted);
