@@ -21,6 +21,7 @@ Raises HindsightUnavailableError on any communication or server failure.
 Never performs silent fallbacks.
 """
 
+import re
 from datetime import datetime
 from typing import Any, List, Optional
 
@@ -47,6 +48,24 @@ STRATEGIST_DISPOSITION = {
     "literalism": 3,
     "empathy": 3,
 }
+
+
+def _belief_details(text: str) -> tuple[Optional[str], List[str], Optional[float]]:
+    rationale_match = re.search(
+        r"\bRationale:\s*(.*?)(?=\s+Evidence:|\s+Confidence:|$)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    evidence_match = re.search(r"\bEvidence:\s*\[([^\]]*)\]", text, flags=re.IGNORECASE)
+    confidence_match = re.search(
+        r"\bConfidence:\s*([0-9]+(?:\.[0-9]+)?)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    rationale = rationale_match.group(1).strip() if rationale_match else None
+    evidence = [item.strip() for item in evidence_match.group(1).split(",") if item.strip()] if evidence_match else []
+    confidence = float(confidence_match.group(1)) if confidence_match else None
+    return rationale, evidence, confidence
 
 
 class HindsightMemoryAdapter(MemoryAdapter):
@@ -308,6 +327,7 @@ class HindsightMemoryAdapter(MemoryAdapter):
             items: List[dict] = []
             for r in rows:
                 metadata = getattr(r, "metadata", None) or {}
+                text = getattr(r, "text", str(r))
                 when = (
                     getattr(r, "learned_at", None)
                     or getattr(r, "mentioned_at", None)
@@ -315,21 +335,34 @@ class HindsightMemoryAdapter(MemoryAdapter):
                 )
                 if hasattr(when, "isoformat"):
                     when = when.isoformat()
-                confidence = getattr(r, "confidence_score", None) or getattr(r, "confidence", None)
+                rationale, parsed_evidence, parsed_confidence = _belief_details(text)
+                confidence = getattr(r, "confidence_score", None)
+                if confidence is None:
+                    confidence = getattr(r, "confidence", None)
                 if confidence is None and isinstance(metadata, dict):
                     confidence = metadata.get("confidence")
+                if confidence is None:
+                    confidence = parsed_confidence
                 try:
                     confidence = float(confidence) if confidence is not None else None
                 except (TypeError, ValueError):
                     confidence = None
+                evidence = (
+                    getattr(r, "supporting_evidence_context", None)
+                    or getattr(r, "evidence", None)
+                    or parsed_evidence
+                )
+                if isinstance(evidence, str):
+                    evidence = [evidence] if evidence else []
+                raw_type = getattr(r, "fact_type", None) or getattr(r, "type", None) or "memory"
                 items.append({
-                    "text": getattr(r, "text", str(r)),
-                    "type": getattr(r, "fact_type", None) or getattr(r, "type", None) or "memory",
+                    "text": text,
+                    "type": getattr(raw_type, "value", raw_type),
                     "when": when,
                     "learned_at": when,
                     "confidence": confidence,
-                    "why": getattr(r, "why_it_was_learned", None) or getattr(r, "rationale", None),
-                    "evidence": getattr(r, "supporting_evidence_context", None) or getattr(r, "evidence", []),
+                    "why": getattr(r, "why_it_was_learned", None) or getattr(r, "rationale", None) or rationale,
+                    "evidence": evidence,
                     "phase": getattr(r, "strategy_phase", None)
                     or (metadata.get("phase") if isinstance(metadata, dict) else None),
                 })

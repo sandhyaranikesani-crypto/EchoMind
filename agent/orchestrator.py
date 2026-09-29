@@ -386,9 +386,16 @@ class EchoMindAgent:
         beliefs = [getattr(b, "what_was_learned", "") for b in (getattr(context, "active_beliefs", []) or [])]
         experiences = list(getattr(context, "relevant_experiences", []) or [])
         blob = " ".join(beliefs + experiences).lower()
+        rejection_feedback = " ".join(
+            experience for experience in experiences if "reject" in experience.lower()
+        ).lower()
 
         # 1) Editorial angle derived from beliefs / feedback (memory-only signal).
-        if any(k in blob for k in ["teardown", "post-mortem", "postmortem", "incident", "outage", "metric"]):
+        if rejection_feedback and any(
+            key in rejection_feedback for key in ["timeline", "incident", "post-mortem", "postmortem", "code"]
+        ):
+            plan["angle"] = "Lead with a technical post-mortem that includes code and an incident timeline."
+        elif any(k in blob for k in ["teardown", "post-mortem", "postmortem", "incident", "outage", "metric"]):
             plan["angle"] = "Lead with a concrete incident or post-mortem, with a real timeline and hard metrics, not opinion."
         elif any(k in blob for k in ["technical", "architecture", "deep-dive", "deep dive", "benchmark"]):
             plan["angle"] = "Go deep and technical, showing the system detail senior engineers respect."

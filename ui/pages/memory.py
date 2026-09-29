@@ -182,13 +182,15 @@ def render_memory() -> None:
             # Belief detail cards
             for b in beliefs:
                 conf = b.get("confidence")
-                why = b.get("why", "Consolidated from historical content metrics and user feedback.")
+                why = b.get("why")
                 evidence_list = b.get("evidence", [])
 
                 with st.container(border=True):
                     st.markdown(f"**Learned principle:** {b.get('text')}")
                     if why:
-                        st.markdown(f"**Causal rationale:** {why or 'Not supplied by this memory record.'}")
+                        st.markdown(f"**Causal rationale:** {why}")
+                    else:
+                        st.caption("Causal rationale was not returned by this memory record.")
 
                     b_c1, b_c2 = st.columns([1, 2])
                     with b_c1:
@@ -213,7 +215,7 @@ def render_memory() -> None:
                                         pass
                                 st.markdown(f"- <code>{ev_label}</code>", unsafe_allow_html=True)
                         else:
-                            st.caption("Supporting evidence: Accumulated historical distribution")
+                            st.caption("Evidence pointers were not returned by this memory record.")
 
     # 2. World Facts Tab
     with tab_facts:
