@@ -10,6 +10,17 @@ from memory.base import HindsightUnavailableError
 from ui.styles import render_header, badge_html
 
 
+def _memory_kind(item: dict) -> str:
+    memory_type = str(item.get("type", "")).lower().rsplit(".", 1)[-1]
+    if memory_type in {"world", "fact", "factual", "world_fact"}:
+        return "World fact"
+    if memory_type in {"experience", "experiential"}:
+        return "Experience"
+    if memory_type in {"belief", "observation", "inferred"}:
+        return "Belief"
+    return "Other"
+
+
 def render_memory() -> None:
     brand_id = st.session_state.get("active_brand_id")
     brand_name = st.session_state.get("active_brand_name", "Unknown brand")
@@ -30,11 +41,11 @@ def render_memory() -> None:
     # Tenant isolation banner
     st.markdown(
         f"""
-        <div class="em-card" style="border-left: 3px solid #10B981;">
+        <div class="em-card">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                 <div>
                     <strong>Isolated memory bank:</strong> <code>{bank_id}</code><br>
-                    <span style="font-size:0.8rem; color:rgba(128,128,128,0.9);">
+                    <span class="em-muted">
                         Tenant isolation guarantees zero cross-brand memory leakage. Switch brands in the sidebar to verify.
                     </span>
                 </div>
@@ -48,7 +59,7 @@ def render_memory() -> None:
     )
 
     if not agent.memory_online:
-        st.warning(f"Memory backend is currently offline. {agent.memory_error or ''}")
+        st.warning("Memory backend is offline. Deterministic strategy analysis remains available.")
         return
 
     # Actions row
@@ -59,7 +70,7 @@ def render_memory() -> None:
                 with st.spinner("Fetching memories from Hindsight..."):
                     st.session_state.ledger = agent.memory_ledger(brand_id)
             except HindsightUnavailableError as exc:
-                st.error(str(exc))
+                st.error("The memory ledger could not be refreshed. The memory backend may be unavailable.")
     with c_btn2:
         if st.button("Seed demo brand memory", use_container_width=True):
             try:
@@ -68,7 +79,7 @@ def render_memory() -> None:
                     st.session_state.ledger = agent.memory_ledger(brand_id)
                 st.success(f"Wrote {n} memory records to bank '{bank_id}'.")
             except HindsightUnavailableError as exc:
-                st.error(str(exc))
+                st.error("Demo memories could not be written. The memory backend may be unavailable.")
 
     # Auto-load ledger if not yet fetched
     if "ledger" not in st.session_state or st.session_state.get("last_ledger_brand") != brand_id:
@@ -87,15 +98,30 @@ def render_memory() -> None:
         )
         return
 
-    # Count categories
-    facts = [it for it in ledger if it.get("type") in ("world", "fact")]
-    experiences = [it for it in ledger if it.get("type") == "experience"]
-    beliefs = [it for it in ledger if it.get("type") in ("belief", "observation")]
+    # Filters operate on the same normalized ledger for each adapter.
+    filter_col, phase_col = st.columns(2)
+    with filter_col:
+        selected_type = st.selectbox(
+            "Memory type",
+            ["All types", "World fact", "Experience", "Belief", "Other"],
+        )
+    phases = sorted({str(item.get("phase") or "Unspecified") for item in ledger})
+    with phase_col:
+        selected_phase = st.selectbox("Strategy phase", ["All phases", *phases])
+
+    filtered_ledger = [
+        item for item in ledger
+        if (selected_type == "All types" or _memory_kind(item) == selected_type)
+        and (selected_phase == "All phases" or str(item.get("phase") or "Unspecified") == selected_phase)
+    ]
+    facts = [it for it in filtered_ledger if _memory_kind(it) == "World fact"]
+    experiences = [it for it in filtered_ledger if _memory_kind(it) == "Experience"]
+    beliefs = [it for it in filtered_ledger if _memory_kind(it) == "Belief"]
 
     # KPI counts
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        st.metric("Total stored items", len(ledger))
+        st.metric("Filtered items", len(filtered_ledger))
     with k2:
         st.metric("World facts (rules)", len(facts))
     with k3:
@@ -123,42 +149,55 @@ def render_memory() -> None:
         else:
             # Timeline chart if multiple beliefs or timestamped
             timeline_data = []
-            for idx, b in enumerate(beliefs):
-                conf = b.get("confidence", 0.75)
-                when = b.get("when") or f"Item {idx + 1}"
-                title = b.get("text", "")[:45] + "..."
-                timeline_data.append({"Label": title, "Confidence": conf, "Timeline": when})
+            for b in beliefs:
+                learned_at = b.get("learned_at") or b.get("when")
+                confidence = b.get("confidence")
+                if learned_at and confidence is not None:
+                    timeline_data.append(
+                        {
+                            "Belief": b.get("text", ""),
+                            "Confidence": float(confidence),
+                            "Learned at": pd.to_datetime(learned_at, errors="coerce"),
+                        }
+                    )
 
             tdf = pd.DataFrame(timeline_data)
+            if not tdf.empty:
+                tdf = tdf.dropna(subset=["Learned at"])
             if not tdf.empty:
                 chart = (
                     alt.Chart(tdf)
                     .mark_line(point=True, strokeWidth=2)
                     .encode(
-                        x=alt.X("Timeline:N", title="Timeline / Evidence accumulation"),
-                        y=alt.Y("Confidence:Q", scale=alt.Scale(domain=[0, 1]), title="Belief confidence score"),
-                        tooltip=["Label", "Timeline", "Confidence"],
-                        color=alt.value("#2563EB"),
+                        x=alt.X("Learned at:T", title="Learned at"),
+                        y=alt.Y("Confidence:Q", scale=alt.Scale(domain=[0, 1]), title="Confidence score"),
+                        tooltip=["Belief", "Learned at:T", "Confidence"],
                     )
                     .properties(height=200)
                 )
-                st.altair_chart(chart, use_container_width=True)
+                st.altair_chart(chart, use_container_width=True, theme="streamlit")
+            else:
+                st.caption("No timestamped confidence values are available for this filtered set.")
 
             # Belief detail cards
             for b in beliefs:
-                conf = b.get("confidence", 0.75)
+                conf = b.get("confidence")
                 why = b.get("why", "Consolidated from historical content metrics and user feedback.")
                 evidence_list = b.get("evidence", [])
 
                 with st.container(border=True):
                     st.markdown(f"**Learned principle:** {b.get('text')}")
                     if why:
-                        st.markdown(f"**Causal rationale:** {why}")
+                        st.markdown(f"**Causal rationale:** {why or 'Not supplied by this memory record.'}")
 
                     b_c1, b_c2 = st.columns([1, 2])
                     with b_c1:
-                        st.caption(f"Confidence score: {conf:.2f}")
-                        st.progress(int(conf * 100))
+                            if conf is not None:
+                                st.caption(f"Confidence score: {float(conf):.2f}")
+                                st.progress(max(0, min(100, int(float(conf) * 100))))
+                            else:
+                                st.caption("Confidence score not provided")
+                            st.caption(f"Learned at: {b.get('learned_at') or b.get('when') or 'Not recorded'}")
                     with b_c2:
                         if evidence_list:
                             st.caption("Supporting database evidence:")
@@ -200,7 +239,7 @@ def render_memory() -> None:
                 dec = exp.get("decision", "REVIEW")
                 var = "success" if dec == "accept" else ("danger" if dec == "reject" else "warning")
                 with st.container(border=True):
-                    st.markdown(badge_html(dec.upper(), var) + f"<span style='font-size:0.8rem; margin-left:8px; color:rgba(128,128,128,0.9);'>{when_str}</span>", unsafe_allow_html=True)
+                    st.markdown(badge_html(dec.upper(), var) + f"<span class='em-muted'>{when_str}</span>", unsafe_allow_html=True)
                     st.markdown(exp.get("text", ""))
 
 

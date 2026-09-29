@@ -144,6 +144,7 @@ class MockMemoryAdapter(MemoryAdapter):
                 "confidence": getattr(belief, "confidence_score", 0.75),
                 "evidence": getattr(belief, "supporting_evidence_context", []),
                 "phase": getattr(belief, "strategy_phase", "default"),
+                "learned_at": la.isoformat() if la else None,
             })
         return items[:limit]
 

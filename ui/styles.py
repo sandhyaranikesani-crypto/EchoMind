@@ -15,11 +15,17 @@ def apply_custom_styles() -> None:
     st.markdown(
         """
         <style>
+        :root {
+            --em-border: color-mix(in srgb, var(--text-color) 18%, transparent);
+            --em-muted: color-mix(in srgb, var(--text-color) 66%, transparent);
+            --em-accent-soft: color-mix(in srgb, var(--primary-color) 10%, transparent);
+        }
+
         /* Base typography scale and reset */
         h1, h2, h3, h4, h5, h6 {
             color: var(--text-color);
             font-weight: 600;
-            letter-spacing: -0.01em;
+            letter-spacing: 0;
             margin-bottom: 0.5rem;
         }
 
@@ -40,7 +46,7 @@ def apply_custom_styles() -> None:
         .em-header {
             margin-bottom: 1.5rem;
             padding-bottom: 0.75rem;
-            border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+            border-bottom: 1px solid var(--em-border);
         }
         .em-header-title {
             font-size: 1.5rem;
@@ -50,7 +56,7 @@ def apply_custom_styles() -> None:
         }
         .em-header-subtitle {
             font-size: 0.875rem;
-            color: rgba(128, 128, 128, 0.9);
+            color: var(--em-muted);
             margin-top: 0.25rem;
             margin-bottom: 0;
         }
@@ -66,28 +72,19 @@ def apply_custom_styles() -> None:
             font-weight: 600;
             line-height: 1.4;
             color: var(--text-color);
-            background-color: rgba(128, 128, 128, 0.08);
-            border: 1px solid rgba(128, 128, 128, 0.25);
+            background-color: var(--em-accent-soft);
+            border: 1px solid var(--em-border);
         }
         .em-badge-neutral {
-            background-color: rgba(128, 128, 128, 0.08);
-            border-color: rgba(128, 128, 128, 0.25);
+            background-color: var(--secondary-background-color);
+            border-color: var(--em-border);
         }
-        .em-badge-success {
-            background-color: rgba(16, 185, 129, 0.12);
-            border-color: rgba(16, 185, 129, 0.4);
-        }
-        .em-badge-warning {
-            background-color: rgba(245, 158, 11, 0.12);
-            border-color: rgba(245, 158, 11, 0.4);
-        }
-        .em-badge-danger {
-            background-color: rgba(239, 68, 68, 0.12);
-            border-color: rgba(239, 68, 68, 0.4);
-        }
+        .em-badge-success,
+        .em-badge-warning,
+        .em-badge-danger,
         .em-badge-info {
-            background-color: rgba(37, 99, 235, 0.12);
-            border-color: rgba(37, 99, 235, 0.4);
+            background-color: var(--em-accent-soft);
+            border-color: var(--primary-color);
         }
         .em-badge-dot {
             width: 7px;
@@ -99,11 +96,12 @@ def apply_custom_styles() -> None:
 
         /* Restrained Cards & Panels */
         .em-card {
-            border: 1px solid rgba(128, 128, 128, 0.2);
-            border-radius: 6px;
+            border: 1px solid var(--em-border);
+            border-radius: 4px;
             padding: 1rem;
             background-color: var(--secondary-background-color);
             margin-bottom: 1rem;
+            box-shadow: 0 1px 2px color-mix(in srgb, var(--text-color) 8%, transparent);
         }
         .em-card-title {
             font-size: 0.875rem;
@@ -116,8 +114,8 @@ def apply_custom_styles() -> None:
 
         /* Diff comparison container */
         .em-diff-box {
-            border: 1px solid rgba(128, 128, 128, 0.2);
-            border-radius: 6px;
+            border: 1px solid var(--em-border);
+            border-radius: 4px;
             padding: 1rem;
             background-color: var(--secondary-background-color);
             height: 100%;
@@ -125,21 +123,21 @@ def apply_custom_styles() -> None:
 
         /* Tables and Dataframes subtle border */
         [data-testid="stDataFrame"] {
-            border: 1px solid rgba(128, 128, 128, 0.2);
+            border: 1px solid var(--em-border);
             border-radius: 4px;
         }
 
         /* Metrics cards */
         [data-testid="stMetric"] {
             background-color: var(--secondary-background-color);
-            border: 1px solid rgba(128, 128, 128, 0.2);
-            border-radius: 6px;
+            border: 1px solid var(--em-border);
+            border-radius: 4px;
             padding: 12px 16px;
         }
 
         /* Expander borders */
         div[data-testid="stExpander"] {
-            border: 1px solid rgba(128, 128, 128, 0.2);
+            border: 1px solid var(--em-border);
             border-radius: 6px;
             background-color: var(--secondary-background-color);
         }
@@ -150,6 +148,10 @@ def apply_custom_styles() -> None:
             font-weight: 500;
             font-size: 0.875rem;
             transition: all 0.15s ease-in-out;
+        }
+        .em-muted {
+            color: var(--em-muted);
+            font-size: 0.8rem;
         }
         </style>
         """,

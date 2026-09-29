@@ -23,16 +23,8 @@ if str(BASE_DIR) not in sys.path:
 import streamlit as st
 
 from config.settings import settings
-from database.seed import seed_database
 from ui.context import ensure_database_ready, build_agent, MOCK_BACKEND, HINDSIGHT_BACKEND
 from ui.styles import apply_custom_styles, badge_html
-
-from ui.pages.overview import render_overview
-from ui.pages.strategy import render_strategy
-from ui.pages.learning import render_learning
-from ui.pages.memory import render_memory
-from ui.pages.ask import render_ask
-from ui.pages.system import render_system
 
 st.set_page_config(
     page_title="EchoMind — Content Strategy Agent",
@@ -50,7 +42,6 @@ repo = ensure_database_ready()
 # Minimal Sidebar Controls
 # ---------------------------------------------------------------------------
 st.sidebar.markdown("### EchoMind")
-st.sidebar.caption("Content strategy agent with long-term memory.")
 
 # Brand selection
 brands = repo.list_brands()
@@ -72,14 +63,7 @@ active_phase = st.sidebar.text_input(
     key="sidebar_phase",
 )
 
-# Backend selection
-active_backend = st.sidebar.radio(
-    "Memory backend",
-    [MOCK_BACKEND, HINDSIGHT_BACKEND],
-    index=1 if settings.HINDSIGHT_API_KEY else 0,
-    help="Mock runs fully offline. Hindsight connects to the configured memory server.",
-    key="sidebar_backend",
-)
+active_backend = MOCK_BACKEND if settings.HINDSIGHT_USE_MOCK else HINDSIGHT_BACKEND
 
 agent = build_agent(active_backend, active_phase)
 
@@ -92,41 +76,27 @@ st.session_state["active_backend"] = active_backend
 st.session_state["agent"] = agent
 st.session_state["repository"] = repo
 
-st.sidebar.divider()
-
 # Backend status indicator
 if agent.memory_online:
-    st.sidebar.markdown(badge_html(f"Memory online ({active_backend})", "success", dot=True), unsafe_allow_html=True)
+    st.sidebar.markdown(badge_html(f"Memory configured ({active_backend})", "success", dot=True), unsafe_allow_html=True)
 else:
-    st.sidebar.markdown(badge_html("Memory offline (deterministic)", "danger", dot=True), unsafe_allow_html=True)
-    if agent.memory_error:
-        st.sidebar.caption(agent.memory_error)
-
-# Maintenance actions
-with st.sidebar.expander("Database & session reset", expanded=False):
-    if st.button("Re-seed database", use_container_width=True):
-        seed_database()
-        st.rerun()
-    if st.button("Clear session state", use_container_width=True):
-        for k in ("comparison", "sim", "ledger", "draft", "last_ledger_brand"):
-            st.session_state.pop(k, None)
-        st.rerun()
+    st.sidebar.markdown(badge_html("Memory offline; deterministic mode", "warning", dot=True), unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Multipage Navigation Setup
 # ---------------------------------------------------------------------------
 pages = {
     "Strategy & Analytics": [
-        st.Page(render_overview, title="Overview", icon=":material/dashboard:", default=True),
-        st.Page(render_strategy, title="Strategy", icon=":material/lightbulb:"),
-        st.Page(render_learning, title="Learning", icon=":material/model_training:"),
+        st.Page("pages/overview.py", title="Overview", icon=":material/dashboard:", default=True),
+        st.Page("pages/strategy.py", title="Strategy", icon=":material/lightbulb:"),
+        st.Page("pages/learning.py", title="Learning", icon=":material/model_training:"),
     ],
     "Memory & Intelligence": [
-        st.Page(render_memory, title="Memory", icon=":material/psychology:"),
-        st.Page(render_ask, title="Ask the strategist", icon=":material/chat:"),
+        st.Page("pages/memory.py", title="Memory", icon=":material/psychology:"),
+        st.Page("pages/ask.py", title="Ask the strategist", icon=":material/chat:"),
     ],
     "Diagnostics": [
-        st.Page(render_system, title="System", icon=":material/dns:"),
+        st.Page("pages/system.py", title="System", icon=":material/dns:"),
     ],
 }
 

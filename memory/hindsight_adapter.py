@@ -307,10 +307,31 @@ class HindsightMemoryAdapter(MemoryAdapter):
             )
             items: List[dict] = []
             for r in rows:
+                metadata = getattr(r, "metadata", None) or {}
+                when = (
+                    getattr(r, "learned_at", None)
+                    or getattr(r, "mentioned_at", None)
+                    or getattr(r, "occurred_start", None)
+                )
+                if hasattr(when, "isoformat"):
+                    when = when.isoformat()
+                confidence = getattr(r, "confidence_score", None) or getattr(r, "confidence", None)
+                if confidence is None and isinstance(metadata, dict):
+                    confidence = metadata.get("confidence")
+                try:
+                    confidence = float(confidence) if confidence is not None else None
+                except (TypeError, ValueError):
+                    confidence = None
                 items.append({
                     "text": getattr(r, "text", str(r)),
                     "type": getattr(r, "fact_type", None) or getattr(r, "type", None) or "memory",
-                    "when": getattr(r, "mentioned_at", None) or getattr(r, "occurred_start", None),
+                    "when": when,
+                    "learned_at": when,
+                    "confidence": confidence,
+                    "why": getattr(r, "why_it_was_learned", None) or getattr(r, "rationale", None),
+                    "evidence": getattr(r, "supporting_evidence_context", None) or getattr(r, "evidence", []),
+                    "phase": getattr(r, "strategy_phase", None)
+                    or (metadata.get("phase") if isinstance(metadata, dict) else None),
                 })
             return items[:limit]
         except Exception as e:

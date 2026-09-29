@@ -43,6 +43,12 @@ def render_strategy() -> None:
         st.info("Click 'Generate recommendation' to run the strategy engine.")
         return
 
+    if not comp.get("memory_online", True):
+        st.warning(
+            "Hindsight could not be reached. This recommendation uses deterministic database evidence only; "
+            "no recalled memory influenced the result."
+        )
+
     pillar = comp.get("recommended_pillar") or {}
     fmt = comp.get("recommended_format") or {}
     without = comp.get("without_memory") or {}
@@ -68,7 +74,7 @@ def render_strategy() -> None:
     with m3:
         score = int(conv.get("score", 0))
         label = conv.get("label", "Exploratory")
-        st.caption(f"Conviction level: {label} ({score}/100)")
+        st.caption(f"Confidence: {label} ({score}/100)")
         st.progress(score)
         if conv.get("memory_boost"):
             st.markdown(
@@ -76,16 +82,44 @@ def render_strategy() -> None:
                 unsafe_allow_html=True,
             )
 
+    st.subheader("Why this recommendation")
+    why_this, why_now, why_format = st.columns(3)
+    with why_this:
+        st.markdown("**Why this pillar**")
+        if pillar:
+            st.write(
+                f"{pillar.get('pillar_name', 'The selected pillar')} is "
+                f"{abs(pillar.get('share_delta_pct', 0)):.1f}% below its target "
+                f"({pillar.get('actual_share_pct', 0):.1f}% actual vs "
+                f"{pillar.get('target_share_pct', 0):.1f}% target)."
+            )
+        else:
+            st.write("No under-served pillar was identified in the selected data.")
+    with why_now:
+        st.markdown("**Why now**")
+        if pillar:
+            days_since = pillar.get("days_since_last_post")
+            recency = f" The last post was {days_since} days ago." if days_since is not None else ""
+            st.write(f"The allocation gap is {abs(pillar.get('share_delta_pct', 0)):.1f} percentage points.{recency}")
+        else:
+            st.write("Timing is based on the current publishing history.")
+    with why_format:
+        st.markdown("**Why this format**")
+        format_reason = (
+            f"{mem_fmt.get('format_name', 'Selected format')} has "
+            f"{mem_fmt.get('avg_engagement_rate', fmt.get('avg_engagement_rate', ''))}% "
+            "average historical engagement."
+        )
+        if plan.get("adjusted"):
+            format_reason = "Memory changed the baseline choice. " + " ".join(adjustments)
+        elif angle:
+            format_reason += " The editorial angle reflects recalled brand memory."
+        st.write(format_reason)
+
     if plan.get("adjusted"):
-        st.markdown(
-            f"""
-            <div class="em-card" style="border-left: 3px solid #F59E0B; margin-top: 0.5rem;">
-                <strong>Memory intervention:</strong> The default winning format
-                (<em>{fmt.get('format_name')}</em>) was replaced with <em>{mem_fmt.get('format_name')}</em>
-                because past feedback rejected the default format for this objective.
-            </div>
-            """,
-            unsafe_allow_html=True,
+        st.info(
+            f"Memory changed the format from {fmt.get('format_name')} to "
+            f"{mem_fmt.get('format_name')} based on prior rejection feedback."
         )
 
     # Honest Uncertainty Callout
@@ -139,6 +173,7 @@ def render_strategy() -> None:
                 {
                     "Source": p.get("source", ""),
                     "Category": p.get("category", ""),
+                    "Type": p.get("type", ""),
                     "Recalled Evidence": p.get("evidence", ""),
                     "Recency / Age": p.get("age", ""),
                     "Influence Weight": p.get("weight", ""),

@@ -3,7 +3,7 @@
 import streamlit as st
 
 from memory.base import HindsightUnavailableError
-from ui.styles import render_header, badge_html
+from ui.styles import render_header
 
 
 def render_ask() -> None:
@@ -21,21 +21,13 @@ def render_ask() -> None:
     )
 
     if not agent.memory_online:
-        st.warning(
-            "Memory backend is currently offline. Reflection requires an active Hindsight connection."
-        )
+        st.warning("Memory is unavailable. Reflect-based answers are disabled; deterministic analytics remain available.")
         return
 
     # Chat history state initialization per brand
     chat_key = f"chat_history_{brand_id}"
     if chat_key not in st.session_state:
-        st.session_state[chat_key] = [
-            (
-                "What is our primary brand voice and target persona?",
-                f"Based on the world facts stored for {brand_name}, your voice is technical, evidence-driven, "
-                f"and strictly avoids hyperbolic hype. The primary persona is senior engineers, SREs, and engineering leaders.",
-            )
-        ]
+        st.session_state[chat_key] = []
 
     # Sample Quick Questions
     st.caption("Quick evaluation prompts:")
@@ -54,6 +46,8 @@ def render_ask() -> None:
     st.markdown("---")
 
     # Render previous messages
+    if not st.session_state[chat_key]:
+        st.info("Ask a question to reflect over this brand's stored facts, feedback, and beliefs.")
     for q, a in st.session_state[chat_key]:
         with st.chat_message("user"):
             st.markdown(q)
@@ -71,14 +65,18 @@ def render_ask() -> None:
             with st.spinner("Synthesizing reflection across Hindsight memory bank..."):
                 try:
                     answer = agent.ask(brand_id, question)
-                except HindsightUnavailableError as exc:
-                    answer = f"Reflection failed: {exc}"
-                except Exception as exc:
-                    answer = f"Unexpected error during reflection: {exc}"
-            st.markdown(answer)
+                except HindsightUnavailableError:
+                    answer = None
+                    st.error("Reflection could not reach the memory backend. The request was not answered.")
+                except Exception:
+                    answer = None
+                    st.error("Reflection failed. Check the System page for backend status.")
+            if answer:
+                st.markdown(answer)
 
-        st.session_state[chat_key].append((question, answer))
-        st.rerun()
+        if answer:
+            st.session_state[chat_key].append((question, answer))
+            st.rerun()
 
 
 if __name__ == "__main__":

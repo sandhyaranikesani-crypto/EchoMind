@@ -65,6 +65,6 @@ def ensure_database_ready() -> ContentRepository:
         try:
             seed_database()
             repo = ContentRepository()
-        except Exception as exc:
-            st.error(f"Failed to initialize database: {exc}")
+        except Exception:
+            st.error("The local database could not be initialized. Check the database configuration and restart the app.")
     return repo

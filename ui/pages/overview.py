@@ -4,7 +4,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from ui.styles import render_header, badge_html
+from ui.styles import render_header
 
 
 def render_overview() -> None:
@@ -25,8 +25,8 @@ def render_overview() -> None:
     try:
         result = agent.analyze_strategy(brand_id, platform_id)
         analysis = result["analysis"]
-    except Exception as exc:
-        st.error(f"Failed to load analytics: {exc}")
+    except Exception:
+        st.error("Analytics could not be loaded for this selection. Check the local database and try again.")
         return
 
     # Top KPI row
@@ -62,28 +62,19 @@ def render_overview() -> None:
                 f"over-indexed at {top_sat['actual_share_pct']:.1f}% "
                 f"({top_sat['share_delta_pct']:+.1f}% above target allocation)."
             )
-        st.markdown(
-            f"""
-            <div class="em-card" style="border-left: 3px solid #2563EB;">
-                <div class="em-card-title">Editorial balance diagnosis</div>
-                {'<br>'.join(gap_texts)}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.subheader("Editorial balance diagnosis")
+        for gap_text in gap_texts:
+            st.write(gap_text.replace("<strong>", "").replace("</strong>", ""))
 
     # Pillar Distribution Table and Grouped Bar Chart
     st.subheader("Content pillar allocation vs targets")
     pillar_rows = []
     for p in analysis.pillar_distribution:
         status_label = "Balanced"
-        status_variant = "neutral"
         if p.get("share_delta_pct", 0) <= -5.0:
             status_label = "Under-served"
-            status_variant = "warning"
         elif p.get("share_delta_pct", 0) >= 5.0:
             status_label = "Saturated"
-            status_variant = "neutral"
 
         pillar_rows.append(
             {
@@ -118,17 +109,13 @@ def render_overview() -> None:
                 .encode(
                     x=alt.X("Pillar:N", title=None, axis=alt.Axis(labelAngle=-20)),
                     y=alt.Y("Share %:Q", title="Share percentage (%)"),
-                    color=alt.Color(
-                        "Metric:N",
-                        scale=alt.Scale(range=["#2563EB", "#94A3B8"]),
-                        legend=alt.Legend(title=None, orient="top"),
-                    ),
+                    color=alt.Color("Metric:N", legend=alt.Legend(title=None, orient="top")),
                     xOffset="Metric:N",
                     tooltip=["Pillar", "Metric", "Share %"],
                 )
                 .properties(height=260)
             )
-            st.altair_chart(chart, use_container_width=True)
+            st.altair_chart(chart, use_container_width=True, theme="streamlit")
 
     st.markdown("---")
 

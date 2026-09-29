@@ -31,11 +31,11 @@ def render_learning() -> None:
     )
 
     sim_critique = st.text_input(
-        "Editorial critique to teach the agent",
+        "Rejection critique",
         value="Our audience prefers deep technical post-mortems with code and incident timelines over high-level culture essays. Lead with concrete incidents and metrics.",
     )
 
-    if st.button("Run learning simulation", type="primary"):
+    if st.button("Run learning cycle", type="primary"):
         if not agent.memory_online:
             st.warning("Memory engine is currently offline. The learning loop requires an active memory backend.")
         else:
@@ -59,11 +59,11 @@ def render_learning() -> None:
                 with st.spinner("Step 3 of 3: Generating updated recommendation with new memory recalled..."):
                     after = agent.generate_recommendation(brand_id, platform_id)
 
-                st.session_state.sim = {"before": before, "after": after}
+                st.session_state.sim = {"before": before, "after": after, "critique": sim_critique}
             except HindsightUnavailableError as exc:
-                st.error(f"Hindsight server error: {exc}")
+                st.error("The learning cycle could not reach memory; no feedback was recorded.")
             except Exception as exc:
-                st.error(f"Learning cycle error: {exc}")
+                st.error("The learning cycle could not be completed. Review the System page for backend status.")
 
     sim = st.session_state.get("sim")
     if sim:
@@ -75,6 +75,8 @@ def render_learning() -> None:
         after_fmt = (ap.get("format") or after.get("recommended_format") or {}).get("format_name", "—")
         before_angle = bp.get("angle", "Default generic angle")
         after_angle = ap.get("angle", "Default generic angle")
+        before_confidence = before.get("conviction") or {}
+        after_confidence = after.get("conviction") or {}
 
         # Before / After side-by-side cards
         c_before, c_after = st.columns(2)
@@ -84,6 +86,10 @@ def render_learning() -> None:
                 st.caption(f"Experiences recalled: {len(before.get('relevant_experiences', []))}")
                 st.markdown(f"**Format:** {before_fmt}")
                 st.markdown(f"**Editorial angle:** {before_angle}")
+                st.markdown(
+                    f"**Confidence:** {before_confidence.get('label', 'Exploratory')} "
+                    f"({before_confidence.get('score', 0)}/100)"
+                )
                 st.markdown("---")
                 st.markdown((before.get("narrative") or {}).get("body", "")[:450] + "...")
 
@@ -93,65 +99,46 @@ def render_learning() -> None:
                 st.caption(f"Experiences recalled: {len(after.get('relevant_experiences', []))}")
                 st.markdown(f"**Format:** {after_fmt}")
                 st.markdown(f"**Editorial angle:** {after_angle}")
+                st.markdown(
+                    f"**Confidence:** {after_confidence.get('label', 'Exploratory')} "
+                    f"({after_confidence.get('score', 0)}/100)"
+                )
                 st.markdown("---")
                 st.markdown((after.get("narrative") or {}).get("body", "")[:450] + "...")
 
         # Explicit Diff Highlight
         st.markdown("---")
         st.subheader("What changed between recommendations")
+        confidence_delta = after_confidence.get("score", 0) - before_confidence.get("score", 0)
 
         diff_col1, diff_col2, diff_col3 = st.columns(3)
         with diff_col1:
-            format_changed = before_fmt != after_fmt
-            status_var = "warning" if format_changed else "neutral"
-            st.markdown(
-                f"""
-                <div class="em-card">
-                    <div class="em-card-title">Format adaptation</div>
-                    <strong>Before:</strong> {before_fmt}<br>
-                    <strong>After:</strong> {after_fmt}<br>
-                    <span style="font-size:0.8rem; color:rgba(128,128,128,0.9);">
-                        {badge_html("Switched format based on rejection", status_var) if format_changed else "Format maintained"}
-                    </span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown("**Format**")
+            st.write(f"{before_fmt} → {after_fmt}")
+            st.caption("Changed after recalled feedback rejected the original format." if before_fmt != after_fmt else "Format maintained.")
 
         with diff_col2:
-            angle_changed = before_angle != after_angle
-            st.markdown(
-                f"""
-                <div class="em-card">
-                    <div class="em-card-title">Editorial angle shift</div>
-                    <strong>Before:</strong> {before_angle or 'None'}<br>
-                    <strong>After:</strong> {after_angle or 'None'}<br>
-                    <span style="font-size:0.8rem;">
-                        {badge_html("Adapted angle to requested criteria", "success") if angle_changed else "Angle maintained"}
-                    </span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.markdown("**Editorial angle**")
+            st.write(f"{before_angle or 'Not set'} → {after_angle or 'Not set'}")
+            st.caption("Updated from the learned critique." if before_angle != after_angle else "Angle maintained.")
 
         with diff_col3:
-            recalled_count = len(after.get("relevant_experiences", []))
-            st.markdown(
-                f"""
-                <div class="em-card">
-                    <div class="em-card-title">Causal memory attribution</div>
-                    <strong>Recalled experiences:</strong> {recalled_count}<br>
-                    <strong>Triggering feedback:</strong> Past rejection retained in Hindsight.<br>
-                    <span style="font-size:0.8rem;">{badge_html("Memory informed the change", "info")}</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
+            st.markdown("**Confidence**")
+            st.write(
+                f"{before_confidence.get('score', 0)}/100 → "
+                f"{after_confidence.get('score', 0)}/100 ({confidence_delta:+d})"
             )
+            st.caption("Confidence includes the newly recalled experience.")
 
         if after.get("relevant_experiences"):
-            st.markdown("**Recalled feedback influencing the decision:**")
+            st.markdown("**Recalled memory behind the change**")
             for exp in after["relevant_experiences"]:
                 st.markdown(f"- {exp}")
+        else:
+            st.info("The second recommendation did not return an episodic memory. The diff is not attributed to feedback.")
+
+        if sim.get("critique"):
+            st.caption(f"Critique retained in this cycle: {sim['critique']}")
 
     st.markdown("---")
 
@@ -185,6 +172,14 @@ def render_learning() -> None:
         help="Accept retains positive reinforcement; Reject forces the agent to explore alternatives.",
     )
 
+    edited_copy = ""
+    if decision == "EDIT":
+        edited_copy = st.text_area(
+            "Edited recommendation",
+            value=(comp.get("with_memory") or {}).get("body", ""),
+            key="learning_edited_copy",
+        )
+
     critique = st.text_area(
         "Critique or editorial guidance (optional)",
         placeholder="e.g. Good strategic direction, but emphasize latency numbers and system architecture instead of culture.",
@@ -194,19 +189,27 @@ def render_learning() -> None:
         summary = f"a {format_name} post under '{pillar_name}'"
         try:
             with st.spinner("Retaining decision into Hindsight long-term memory..."):
+                retained_critique = critique or None
+                if decision == "EDIT" and edited_copy:
+                    retained_critique = (
+                        f"{critique.strip()}\nEdited copy: {edited_copy}" if critique.strip()
+                        else f"Edited copy: {edited_copy}"
+                    )
                 agent.record_feedback(
                     brand_id=brand_id,
                     recommendation_id=comp["recommendation_id"],
                     decision=decision,
                     context_summary=summary,
-                    critique=critique or None,
+                    critique=retained_critique,
                 )
             st.success(
                 f"Feedback recorded ({decision}). Return to the Strategy page and regenerate "
                 f"to see the agent adapt to this feedback."
             )
         except HindsightUnavailableError as exc:
-            st.error(f"Feedback was not persisted: {exc}")
+            st.error("Feedback was not persisted because the memory backend is unavailable. The System page shows its status.")
+        except Exception:
+            st.error("Feedback could not be submitted. No memory change was confirmed.")
 
 
 if __name__ == "__main__":
